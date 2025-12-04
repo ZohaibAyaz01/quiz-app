@@ -2,7 +2,7 @@ streamlit
 google-generativeai
 python-dotenv
 tqdm
-openpyxl
 pandas
+openpyxl
 PyPDF2
 python-docx
