@@ -7,48 +7,74 @@ import pandas as pd
 import glob
 from openpyxl import Workbook
 
-# -----------------------------
-# NEW: API CONFIG (Modern Model)
-# -----------------------------
-genai.configure(api_key=os.getenv("GEMINI_API"))
+# -------------------------------------------------------------
+# GLOBAL ERROR-SAFE WRAPPER
+# -------------------------------------------------------------
+def safe_run(function, *args, **kwargs):
+    try:
+        return function(*args, **kwargs)
+    except Exception:
+        # Show friendly popup (no traceback)
+        st.error("⚠ Something went wrong. Please try again.")
+        return None
 
+
+# -------------------------------------------------------------
+# GEMINI API SETUP
+# -------------------------------------------------------------
+genai.configure(api_key=os.getenv("GEMINI_API"))
 model = genai.GenerativeModel("models/gemini-2.5-flash")
 
 
-# -----------------------------
-# Helper Functions
-# -----------------------------
-
-def generate_quiz(full_content: str):
+# -------------------------------------------------------------
+# Function: Generate Quiz (SAFE JSON)
+# -------------------------------------------------------------
+def generate_quiz(full_content):
     prompt = f"""
-    Create a cybersecurity quiz with EXACTLY 10 MCQs.
+You are an expert exam generator.
 
-    STRICT JSON FORMAT:
+Generate a quiz in STRICT JSON ONLY.
+DO NOT add any explanation, markdown, comments, or extra text.
+
+Format EXACTLY like this:
+{{
+  "questions": [
     {{
-        "quiz": [
-            {{
-                "question": "...",
-                "options": ["A. ...", "B. ...", "C. ...", "D. ..."],
-                "correct": "A",
-                "explanation": "..."
-            }}
-        ]
+      "question": "string",
+      "options": ["A: ...", "B: ...", "C: ...", "D: ..."],
+      "correct": "A",
+      "explanation": "string"
     }}
+  ]
+}}
 
-    No extra text. No notes. No paragraphs.
+Generate 10 questions based on this content:
 
-    Content to use:
-    {full_content}
-    """
+{full_content}
+"""
 
     response = model.generate_content(prompt)
-    return response.text.strip()
+    text = response.text.strip()
+
+    # Remove accidental triple backticks
+    if text.startswith("```"):
+        text = text.replace("```json", "").replace("```", "").strip()
+
+    return text
 
 
-def parse_quiz(quiz_text: str):
-    data = json.loads(quiz_text)
+# -------------------------------------------------------------
+# Function: Parse Quiz JSON (SAFE)
+# -------------------------------------------------------------
+def parse_quiz(quiz_text):
+    try:
+        data = json.loads(quiz_text)
+    except:
+        st.error("The AI did NOT return valid JSON. Please regenerate the quiz.")
+        return None
+
     parsed = []
-    for item in data["quiz"]:
+    for item in data["questions"]:
         parsed.append({
             "question": item["question"],
             "options": item["options"],
@@ -58,101 +84,130 @@ def parse_quiz(quiz_text: str):
     return parsed
 
 
+# -------------------------------------------------------------
+# Save + Load Quiz
+# -------------------------------------------------------------
 def save_quiz_file(quiz_text, start_time, end_time):
-    with open("latest_quiz.json", "w") as f:
-        json.dump({
-            "quiz_text": quiz_text,
-            "start_time": start_time,
-            "end_time": end_time
-        }, f, indent=4)
+    try:
+        with open("latest_quiz.json", "w") as f:
+            json.dump({
+                "quiz_text": quiz_text,
+                "start_time": start_time,
+                "end_time": end_time
+            }, f, indent=4)
+        return True
+    except:
+        st.error("Could not save quiz file.")
+        return None
 
 
 def load_quiz_file():
     try:
         with open("latest_quiz.json", "r") as f:
             return json.load(f)
-    except FileNotFoundError:
+    except:
         return None
 
 
+# -------------------------------------------------------------
+# Save student results
+# -------------------------------------------------------------
 def save_student_results(student_name, score, parsed_questions, user_answers):
-    timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
-    results = []
-    for i, q in enumerate(parsed_questions):
-        results.append({
-            "question": q["question"],
-            "student_answer": user_answers[i],
-            "correct_answer": q["correct"],
-            "explanation": q["explanation"]
-        })
-    filename = f"results_{student_name}_{timestamp}.json"
-    with open(filename, "w") as f:
-        json.dump({
-            "student_name": student_name,
-            "score": score,
-            "answers": results
-        }, f, indent=4)
-    return filename
+    try:
+        timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+        results = []
+
+        for i, q in enumerate(parsed_questions):
+            results.append({
+                "question": q["question"],
+                "student_answer": user_answers[i],
+                "correct_answer": q["correct"],
+                "explanation": q["explanation"]
+            })
+
+        filename = f"results_{student_name}_{timestamp}.json"
+
+        with open(filename, "w") as f:
+            json.dump({
+                "student_name": student_name,
+                "score": score,
+                "answers": results
+            }, f, indent=4)
+
+        return filename
+    except:
+        st.error("Could not save student results.")
+        return None
 
 
+# -------------------------------------------------------------
+# Load all results
+# -------------------------------------------------------------
 def load_all_results():
-    all_results = []
-    for file in glob.glob("results_*.json"):
-        with open(file, "r") as f:
-            all_results.append(json.load(f))
-    return all_results
+    try:
+        all_results = []
+        for file in glob.glob("results_*.json"):
+            with open(file, "r") as f:
+                all_results.append(json.load(f))
+        return all_results
+    except:
+        st.error("Error loading student results.")
+        return []
 
 
+# -------------------------------------------------------------
+# Export marks sheet
+# -------------------------------------------------------------
 def export_excel(results):
-    df = pd.DataFrame([{
-        "Student": r["student_name"],
-        "Score": r["score"]
-    } for r in results])
+    try:
+        df = pd.DataFrame([{
+            "Student": r["student_name"],
+            "Score": r["score"]
+        } for r in results])
 
-    df.to_excel("marks_sheet.xlsx", index=False)
-    return "marks_sheet.xlsx"
+        df.to_excel("marks_sheet.xlsx", index=False)
+        return "marks_sheet.xlsx"
+    except:
+        st.error("Could not export Excel file.")
+        return None
 
 
-# --------------------------------------------------
-# STREAMLIT APP UI
-# --------------------------------------------------
-
+# -------------------------------------------------------------
+# STREAMLIT UI
+# -------------------------------------------------------------
 st.title("Cybersecurity Quiz Platform")
+
 mode = st.sidebar.selectbox("Select Mode:", ["Teacher", "Student"])
 
-# --------------------------------------------------
-# TEACHER MODE (PASSWORD PROTECTED)
-# --------------------------------------------------
 
+# ============================
+# TEACHER MODE
+# ============================
 if mode == "Teacher":
     st.header("Teacher Login")
 
     password = st.text_input("Enter Teacher Password:", type="password")
-    if password != "admin123":  # change this password
+    if password != "admin123":
         st.warning("Enter correct password to continue.")
         st.stop()
 
     st.success("Login successful ✔")
     st.header("Teacher Dashboard")
 
-    # -----------------------------------
-    # NEW: Mandatory + Optional Content
-    # -----------------------------------
-
     st.subheader("Quiz Information")
 
     mandatory_topic = st.text_input("Enter Main Quiz Topic (Required)*")
 
-    optional_text = st.text_area("Optional Supporting Content (Not Required)")
+    optional_text = st.text_area("Optional Supporting Text")
 
     optional_file = st.file_uploader(
-        "Upload Optional Document (PDF, TXT, DOCX)", 
+        "Upload Optional Document (PDF, TXT, DOCX)",
         type=["pdf", "txt", "docx"]
     )
 
     optional_file_text = ""
 
-    # File Reading Logic
+    # SAFE FILE READING
     if optional_file:
         try:
             if optional_file.type == "text/plain":
@@ -162,51 +217,54 @@ if mode == "Teacher":
                 import PyPDF2
                 reader = PyPDF2.PdfReader(optional_file)
                 text = ""
-                for page in reader.pages:
-                    text += page.extract_text()
+                for p in reader.pages:
+                    text += p.extract_text()
                 optional_file_text = text
 
             elif optional_file.type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
                 import docx
                 doc = docx.Document(optional_file)
-                text = "\n".join([p.text for p in doc.paragraphs])
-                optional_file_text = text
+                optional_file_text = "\n".join([p.text for p in doc.paragraphs])
 
         except:
-            st.warning("Unable to read uploaded file.")
+            st.error("⚠ Could not read file.")
 
-    # Quiz Time
-    start_time = st.datetime_input("Select Quiz Start Date & Time")
-    end_time = st.datetime_input("Select Quiz Expiry Date & Time")
+    start_time = st.datetime_input("Quiz Start Time")
+    end_time = st.datetime_input("Quiz End Time")
 
-    # Generate Quiz Button
+    # Generate Quiz
     if st.button("Generate Quiz"):
         if not mandatory_topic.strip():
-            st.error("Main Quiz Topic is required!")
-        else:
-            full_content = (
-                f"MAIN TOPIC:\n{mandatory_topic}\n\n"
-                f"OPTIONAL TEXT:\n{optional_text}\n\n"
-                f"OPTIONAL FILE CONTENT:\n{optional_file_text}"
-            )
+            st.error("Main topic required.")
+            st.stop()
 
-            with st.spinner("Generating quiz using Gemini..."):
-                try:
-                    quiz_text = generate_quiz(full_content)
-                    save_quiz_file(quiz_text, str(start_time), str(end_time))
+        full_content = (
+            f"MAIN TOPIC:\n{mandatory_topic}\n\n"
+            f"OPTIONAL TEXT:\n{optional_text}\n\n"
+            f"FILE CONTENT:\n{optional_file_text}"
+        )
 
-                    st.success("🎉 Quiz generated successfully!")
+        with st.spinner("Generating quiz..."):
+            quiz_text = safe_run(generate_quiz, full_content)
+            if not quiz_text:
+                st.stop()
 
-                    parsed = parse_quiz(quiz_text)
-                    st.subheader("Preview of First 3 Questions:")
-                    for q in parsed[:3]:
-                        st.write(q["question"])
-                        st.write(q["options"])
+            saved = safe_run(save_quiz_file, quiz_text, str(start_time), str(end_time))
+            if not saved:
+                st.stop()
 
-                except Exception as e:
-                    st.error(f"Error: {e}")
+            parsed = safe_run(parse_quiz, quiz_text)
+            if not parsed:
+                st.stop()
 
-    # Students Results Section
+            st.success("Quiz Generated Successfully!")
+
+            st.subheader("Preview of First 3 Questions:")
+            for q in parsed[:3]:
+                st.write(q["question"])
+                st.write(q["options"])
+
+    # View Results
     st.subheader("All Student Results")
     results = load_all_results()
 
@@ -215,20 +273,21 @@ if mode == "Teacher":
             "Student": r["student_name"],
             "Score": r["score"]
         } for r in results])
+
         st.table(df)
 
-        if st.button("Download Marks Sheet (Excel)"):
+        if st.button("Download Marks Sheet"):
             filename = export_excel(results)
-            with open(filename, "rb") as f:
-                st.download_button("Download Excel File", f, filename)
+            if filename:
+                with open(filename, "rb") as f:
+                    st.download_button("Download Excel", f, filename)
     else:
-        st.info("No student results available yet.")
+        st.info("No student results yet.")
 
 
-# --------------------------------------------------
+# ============================
 # STUDENT MODE
-# --------------------------------------------------
-
+# ============================
 elif mode == "Student":
     st.header("Take Quiz")
 
@@ -245,7 +304,7 @@ elif mode == "Student":
     end_time = datetime.fromisoformat(quiz_data["end_time"])
     now = datetime.now()
 
-    # Prevent early/late access
+    # Timing Control
     if now < start_time:
         st.error(f"Quiz will start at: {start_time}")
         st.stop()
@@ -255,6 +314,8 @@ elif mode == "Student":
         st.stop()
 
     parsed_questions = parse_quiz(quiz_text)
+    if not parsed_questions:
+        st.stop()
 
     user_answers = []
 
@@ -270,11 +331,15 @@ elif mode == "Student":
 
         score = 0
         for i, q in enumerate(parsed_questions):
-            selected_letter = user_answers[i][0]
-            if selected_letter == q["correct"]:
-                score += 1
+            try:
+                if user_answers[i][0] == q["correct"]:
+                    score += 1
+            except:
+                st.error("⚠ Error checking answers.")
+                st.stop()
 
         st.success(f"{student_name}, you scored {score} / {len(parsed_questions)}")
 
-        filename = save_student_results(student_name, score, parsed_questions, user_answers)
-        st.info(f"Saved as: **{filename}**")
+        file_result = save_student_results(student_name, score, parsed_questions, user_answers)
+        if file_result:
+            st.info(f"Saved as: **{file_result}**")
