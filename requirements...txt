@@ -1,7 +1,8 @@
 streamlit
-openai
-pandas
-matplotlib
 google-generativeai
-python-docx
+python-dotenv
 tqdm
+openpyxl
+pandas
+PyPDF2
+python-docx
